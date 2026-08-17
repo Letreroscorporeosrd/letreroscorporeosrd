@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-azul: #0f3358;
+  --brand-naranja: #f2661c;
+}
+
+body {
+  @apply bg-white text-brand-negro font-body antialiased;
+}
+
+h1,
+h2,
+h3 {
+  @apply font-heading;
+}

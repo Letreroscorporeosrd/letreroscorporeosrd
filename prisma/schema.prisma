@@ -1,0 +1,290 @@
+// Schema de base de datos — Letreros Corpóreos RD
+// PostgreSQL + Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------
+// Auth (NextAuth) — solo se usa para el panel /admin
+// ------------------------------------------------------
+
+model AdminUser {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  role          AdminRole @default(EDITOR)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+}
+
+enum AdminRole {
+  OWNER
+  ADMIN
+  EDITOR
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String    @id @default(cuid())
+  sessionToken String    @unique
+  userId       String
+  expires      DateTime
+  user         AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------------------------------
+// Portafolio
+// ------------------------------------------------------
+
+model Project {
+  id          String         @id @default(cuid())
+  title       String
+  slug        String         @unique
+  category    ProjectCategory
+  description String         @db.Text
+  client      String?
+  location    String?
+  materials   String[]
+  featured    Boolean        @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  media       ProjectMedia[]
+}
+
+enum ProjectCategory {
+  CORPOREOS
+  FACHADAS
+  ACM
+  ACRILICO
+  CAJAS_DE_LUZ
+  LED
+  NEON
+  SENALIZACION
+}
+
+model ProjectMedia {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  url       String
+  type      MediaType @default(IMAGE)
+  isBefore  Boolean   @default(false) // true = foto "antes", false = "después"/normal
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+// ------------------------------------------------------
+// Equipo / mascotas
+// ------------------------------------------------------
+
+model TeamMember {
+  id          String   @id @default(cuid())
+  name        String
+  role        String
+  description String   @db.Text
+  imageUrl    String
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ------------------------------------------------------
+// Historia / línea de tiempo
+// ------------------------------------------------------
+
+model TimelineEvent {
+  id          String   @id @default(cuid())
+  date        DateTime
+  title       String
+  description String   @db.Text
+  imageUrl    String?
+  order       Int      @default(0)
+}
+
+// ------------------------------------------------------
+// Banners / home
+// ------------------------------------------------------
+
+model Banner {
+  id        String    @id @default(cuid())
+  title     String
+  subtitle  String?
+  imageUrl  String
+  linkUrl   String?
+  active    Boolean   @default(true)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+}
+
+// ------------------------------------------------------
+// Tienda (materiales)
+// ------------------------------------------------------
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  category    String   // acrílico, ACM, LED, vinilos, herramientas, etc.
+  description String   @db.Text
+  price       Decimal  @db.Decimal(10, 2)
+  unit        String   // m², unidad, rollo, etc.
+  stock       Int      @default(0)
+  imageUrl    String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ------------------------------------------------------
+// Letreros con precio fijo (catálogo de modelos)
+// ------------------------------------------------------
+
+model SignModel {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String   @db.Text
+  basePrice   Decimal  @db.Decimal(10, 2)
+  sizeOptions Json?    // ej. [{ label: "60x40cm", price: 3500 }, ...]
+  imageUrl    String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ------------------------------------------------------
+// Aprende (talleres / cursos)
+// ------------------------------------------------------
+
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String   @db.Text
+  price       Decimal? @db.Decimal(10, 2)
+  imageUrl    String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+// ------------------------------------------------------
+// Asociados
+// ------------------------------------------------------
+
+model Partner {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @db.Text
+  services    String[]
+  logoUrl     String?
+  website     String?
+  instagram   String?
+  order       Int      @default(0)
+}
+
+// ------------------------------------------------------
+// Reseñas (con moderación)
+// ------------------------------------------------------
+
+model Review {
+  id         String       @id @default(cuid())
+  authorName String
+  rating     Int          // 1-5
+  comment    String       @db.Text
+  status     ReviewStatus @default(PENDING)
+  featured   Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  moderatedAt DateTime?
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DELETED
+}
+
+// ------------------------------------------------------
+// Cotizador
+// ------------------------------------------------------
+
+model QuoteRequest {
+  id            String      @id @default(cuid())
+  signType      String
+  width         Decimal     @db.Decimal(10, 2)
+  height        Decimal     @db.Decimal(10, 2)
+  material      String
+  illumination  String?
+  quantity      Int         @default(1)
+  installation  Boolean     @default(false)
+  location      String?
+  photoUrl      String?
+  clientName    String
+  clientPhone   String
+  clientEmail   String?
+  notes         String?     @db.Text
+  status        QuoteStatus @default(NEW)
+  createdAt     DateTime    @default(now())
+}
+
+enum QuoteStatus {
+  NEW
+  IN_REVIEW
+  QUOTED
+  WON
+  LOST
+}
+
+// ------------------------------------------------------
+// Configuración general (singleton)
+// ------------------------------------------------------
+
+model Settings {
+  id            String   @id @default("singleton")
+  logoUrl       String?
+  sealUrl       String?
+  phone         String?
+  whatsapp      String?
+  address       String?
+  hours         String?
+  email         String?
+  instagramUrl  String?
+  facebookUrl   String?
+  tiktokUrl     String?
+  youtubeUrl    String?
+  updatedAt     DateTime @updatedAt
+}
